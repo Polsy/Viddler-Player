@@ -1,0 +1,5 @@
+#!/usr/bin/python
+
+viddlerCookie = 'Cookie: ACEGI_SECURITY_HASHED_REMEMBER_ME_COOKIE=YOUR_VIDDLER_LOGIN_COOKIE'
+
+apiKey = 'YOUR_VIDDLER_API_COOKIE'

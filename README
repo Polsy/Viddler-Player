@@ -1,0 +1,8 @@
+Viddler player page
+
+This script generates a page that embeds Viddler videos at either the
+correct resolution for the FLV file encoded by Viddler, or at the
+resolution of the source video. This, autoplay and player type settings
+can also be set permanently via cookies.
+
+Polsy, 15/09/2009
