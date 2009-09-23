@@ -203,7 +203,7 @@ if vidUser and vidVid:
         vExt = ''
 
       if vWidth == '0':
-        # Try getting the resolution from the FLV via a partial download
+        # Try getting the resolution from the FLV (which it most likely is) via a partial download
         flvFile = '/tmp/' + vNum
         flvBin = commands.getoutput("wget -q --header='" + viddlerCookie + "' -O - " + vPage[:-1] + ".flv | head -c 65536")
         f = open(flvFile, 'w')
@@ -305,7 +305,8 @@ elif vidUser and vidVid:
     vWidth = '640'
     vHeight = '480'
     sourceRes += '<br><i>This video appears to have a width of 0, so it\'s being rendered at 640x480 so that there\'s something to see<br>(error in resolution detection was: ' + zeroError + ')</i>'
-  elif (int(vWidth) > 640 or int(vWidth) < 320):
+
+  elif (int(vWidth) > 640 or int(vWidth) < 320) and vExt != 'flv': # FLVs aren't reencoded, don't resize them
     vh = int(vHeight)
     vw = int(vWidth)
     vRate = 640.0 / vw
