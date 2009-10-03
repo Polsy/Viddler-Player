@@ -246,14 +246,30 @@ function fullify() {
   d.parentNode.removeChild(d);
   d = document.getElementById("bottomDiv");
   d.parentNode.removeChild(d);
-  v=document.getElementById("vEmbed");
-  if(v == null) { v=document.getElementById("viddler"); }
-  v.width=document.body.clientWidth-20;
-  v.height=document.body.clientHeight-16;
-  document.body.bgColor="black";
+  v = document.getElementById("vEmbed");
+  if(v == null) { v = document.getElementById("viddler"); }
+  v.width = document.body.clientWidth-20;
+  v.height = document.body.clientHeight-16;
+  document.body.bgColor = "black";
 
   // Hide scrollbars
-  document.body.style.overflow="hidden";
+  document.body.style.overflow = "hidden";
+}
+
+function x2() {
+  b = document.getElementById("btnDbl");
+  v = document.getElementById("vEmbed");
+  if(v == null) { v = document.getElementById("viddler"); }
+
+  if(b.innerHTML == "x2") {
+    b.innerHTML = "x1";
+    h = parseInt(v.height);
+    v.width *= 2; v.height = (h * 2) - 42;
+  } else {
+    b.innerHTML = "x2";
+    h = parseInt(v.height);
+    v.width /= 2; v.height = (h + 42) / 2;
+  }
 }
 
 function showHideSettings() {
@@ -367,7 +383,7 @@ elif vidUser and vidVid:
   print '<a href="' + vPage + '">Viddler page</a>',
   if vExt != '':
     print '<a href="' + vPage[:-1] + '.' + vExt + '">Download original</a>'
-  print '<br><script language="JavaScript">document.write(\'<button onclick="fullify();">Fill browser window</button>\');</script>'
+  print '<br><script language="JavaScript">document.write(\'<button id="btnDbl" onclick="x2();">x2</button> <button onclick="fullify();">Fill browser window</button>\');</script>'
 
 print """<br><br><br>
 <form method="GET">"""
