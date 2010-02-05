@@ -193,12 +193,14 @@ if vidUser and vidVid:
 
     if vNum:
       # Still need to do this for the download link
-      vOrigStr = commands.getoutput("/usr/bin/wget -q --header='" + viddlerCookie + "' -O - " + vPage + " | grep dmoriginal")
+      vOrigStr = commands.getoutput("/usr/bin/wget -q --header='" + viddlerCookie + "' -O - " + vPage + " | egrep 'dmoriginal|dmflash'")
       if re.search('dmoriginal', vOrigStr):
         if re.search('\.unknown">', vOrigStr):
-          vExt = 'avi'
+          vExt = 'unknown'
         else:
           vExt = re.search('\.(.{3,4})">Original</a>', vOrigStr).group(1)
+      elif re.search('dmflash', vOrigStr):
+        vExt = 'flv'
       else:
         vExt = ''
 
@@ -382,7 +384,11 @@ elif vidUser and vidVid:
   print '<br><br>'
   print '<a href="' + vPage + '">Viddler page</a>',
   if vExt != '':
-    print '<a href="' + vPage[:-1] + '.' + vExt + '">Download original</a>'
+    if vExt == 'flv':
+      print '<a href="' + vPage[:-1] + '.' + vExt + '">Download FLV</a>'
+    else:
+      print '<a href="' + vPage[:-1] + '.' + vExt + '">Download original</a>'
+
   print '<br><script language="JavaScript">document.write(\'<button id="btnDbl" onclick="x2();">x2</button> <button onclick="fullify();">Fill browser window</button>\');</script>'
 
 print """<br><br><br>
