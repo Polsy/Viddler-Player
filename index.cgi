@@ -208,6 +208,7 @@ if vidUser and vidVid:
         # Try getting the resolution from the FLV (which it most likely is) via a partial download
         flvFile = '/tmp/' + vNum
         flvBin = commands.getoutput("wget -q --header='" + viddlerCookie + "' -O - " + vPage[:-1] + ".flv | head -c 65536")
+        #flvBin = commands.getoutput("wget -q --header='" + viddlerCookie + "' -O - " + vPage[:-1] + ".flv | head -c 800000")
         f = open(flvFile, 'w')
         f.write(flvBin)
         f.close()
@@ -243,6 +244,8 @@ print '</head>'
 
 print """<body bgcolor="#CCCCCC">
 <script language="JavaScript">
+var trueW, trueH;
+
 function fullify() {
   d = document.getElementById("topDiv");
   d.parentNode.removeChild(d);
@@ -258,19 +261,13 @@ function fullify() {
   document.body.style.overflow = "hidden";
 }
 
-function x2() {
-  b = document.getElementById("btnDbl");
+function szChange() {
+  s = document.getElementById("pickSz");
   v = document.getElementById("vEmbed");
   if(v == null) { v = document.getElementById("viddler"); }
 
-  if(b.innerHTML == "x2") {
-    b.innerHTML = "x1";
-    h = parseInt(v.height);
-    v.width *= 2; v.height = (h * 2) - 42;
-  } else {
-    b.innerHTML = "x2";
-    h = parseInt(v.height);
-    v.width /= 2; v.height = (h + 42) / 2;
+  if(s && s.value && v) {
+    v.width = trueW * (s.value / 100); v.height = trueH * (s.value / 100) + 42;
   }
 }
 
@@ -385,11 +382,11 @@ elif vidUser and vidVid:
   print '<a href="' + vPage + '">Viddler page</a>',
   if vExt != '':
     if vExt == 'flv':
-      print '<a href="' + vPage[:-1] + '.' + vExt + '">Download FLV</a>'
+      print '<a href="' + vPage[:-1] + '.flv">Download FLV</a>'
     else:
       print '<a href="' + vPage[:-1] + '.' + vExt + '">Download original</a>'
 
-  print '<br><script language="JavaScript">document.write(\'<button id="btnDbl" onclick="x2();">x2</button> <button onclick="fullify();">Fill browser window</button>\');</script>'
+  print '<br><script language="JavaScript">trueW=' + vWidth + '; trueH=' + str(int(vHeight)-42) + '; document.write(\'<select id="pickSz" onchange="szChange();");"><option value="75">75%<option value="100" selected>100%<option value="200">200%</select> <button onclick="fullify();">Fill browser window</button>\');</script>'
 
 print """<br><br><br>
 <form method="GET">"""
