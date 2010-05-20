@@ -167,7 +167,8 @@ if vidUser and vidVid:
     vViews = f.readline().rstrip()
     f.close()
 
-    if (time.time() - os.path.getmtime(cacheFile)) > 2*60*60: # reread info (for views, primarily)
+    # reread info (mainly to update view count) - always do this if views < 5 to stop 'wow I was the first view!' posts
+    if int(vViews) < 5 or (time.time() - os.path.getmtime(cacheFile)) > 2*60*60:
       (newVUpper, newVNum, newVTitle, newVWidth, newVHeight, newVDesc, newVViews) = getVinfo(vNum, 2)
 
       if newVNum: # failure isn't particularly problematic
@@ -216,7 +217,10 @@ if vidUser and vidVid:
         if avcRet == 0:
           (vWidth, vHeight) = re.match('(\d+)x(\d+)', avcRes).groups()
         else:
-          zeroError = avcRes
+          if vExt == '':
+            vHeight = 'download not enabled for video'
+          else:
+            vHeight = avcRes
  
       f = codecs.open(cacheFile, 'w', 'utf-8')
       f.write(vNum + '\n')
@@ -317,9 +321,9 @@ elif vidUser and vidVid:
   encodedRes = ''
 
   if vWidth == '0':
+    sourceRes = 'Source resolution: 0x0<br><i>This video appears to have a width of 0, so it\'s being rendered at 640x480 so that there\'s something to see<br>(error in resolution detection was: ' + vHeight + ')</i>'
     vWidth = '640'
     vHeight = '480'
-    sourceRes += '<br><i>This video appears to have a width of 0, so it\'s being rendered at 640x480 so that there\'s something to see<br>(error in resolution detection was: ' + zeroError + ')</i>'
 
   elif (int(vWidth) > 640 or int(vWidth) < 320) and vExt != 'flv': # FLVs aren't reencoded, don't resize them
     vh = int(vHeight)
