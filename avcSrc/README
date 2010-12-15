@@ -1,8 +1,0 @@
-getFLVAVCRes is mostly composed of avc.c, avc.h and types.h from FLVMeta
-version 1.0.9, which is available at http://code.google.com/p/flvmeta/
-
-avc.c has been modified with a main() to read the resolution of the given
-FLV AVC file, and types.h has had a #include commented out that was not
-required for building getFLVAVCRes.
-
-Polsy, 15/09/2009

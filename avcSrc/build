@@ -1,3 +1,0 @@
-#!/bin/sh
-gcc -Wall -DHAVE_CONFIG_H -I. avc.c -o getFLVAVCRes
-#gcc -g -Wall -DHAVE_CONFIG_H -I. avc.c -o getFLVAVCRes
