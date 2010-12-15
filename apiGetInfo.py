@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-import md5
 import os
 import random
 import xml.dom.minidom
@@ -11,12 +10,12 @@ from vidKeys import *
 
 def getVinfo(ident, type):
   fileName = '/tmp/vid' + `int(random.random()*9999)`
-  (author, id, title, width, height, desc, views) = ('', '', '', '0', '0', '', '0')
+  (author, id, title, width, height, desc, views, upDate) = ('', '', '', '0', '0', '', '0', '0')
 
   if type == 1:
-    os.system('wget -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetailsByUrl&api_key=' + apiKey + '&url=' + ident + '&include_comments=0"')
+    os.system('wget --timeout=120 -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetailsByUrl&api_key=' + apiKey + '&url=' + ident + '&include_comments=0"')
   else:
-    os.system('wget -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetails&api_key=' + apiKey + '&video_id=' + ident + '&include_comments=0"')
+    os.system('wget --timeout=120 -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetails&api_key=' + apiKey + '&video_id=' + ident + '&include_comments=0"')
 
   try:
     xmlDoc = xml.dom.minidom.parse(fileName)
@@ -43,11 +42,13 @@ def getVinfo(ident, type):
           desc = curNode.firstChild.data
       elif curNode.tagName == 'view_count':
         views = curNode.firstChild.data
+      elif curNode.tagName == 'upload_time':
+        upDate = curNode.firstChild.data
   
       curNode = curNode.nextSibling
   except:
-    return (author, id, title, width, height, desc, views)
+    return (author, id, title, width, height, desc, views, upDate)
 
   os.remove(fileName)
 
-  return (author, id, title, width, height, desc, views)
+  return (author, id, title, width, height, desc, views, upDate)
