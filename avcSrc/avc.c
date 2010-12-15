@@ -347,7 +347,20 @@ int main(int argc, char *argv[]) {
   // First byte is the frame type. Must be a keyframe, it's the first one.
   fread(&vInfo, 1, 1, f);
   if((vInfo & 7) != 7) {
-    printf("Not AVC (codec %d)\n", (vInfo & 7));
+    switch(vInfo & 7) {
+      case 2:
+        printf("Not AVC FLV (H263 codec)\n"); break;
+      case 3:
+        printf("Not AVC FLV (screenvideo codec)\n"); break;
+      case 4:
+        printf("Not AVC FLV (VP6 codec)\n"); break;
+      case 5:
+        printf("Not AVC FLV (VP6 alpha codec)\n"); break;
+      case 6:
+        printf("Not AVC FLV (screenvideo v2 codec)\n"); break;
+      default:
+        printf("Not AVC FLV (codec %d)\n", (vInfo & 7)); break;
+    }
     fclose(f);
     return 1;
   }
