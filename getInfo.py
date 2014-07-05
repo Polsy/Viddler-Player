@@ -8,17 +8,11 @@ import subprocess
 import xml.dom.minidom
 from vidKeys import *
 
-# Type 1: by URL
-# Type 2: by ID
+def getVinfo(vid):
+  (author, title, width, height, desc, views, upDate, srcURL, encURL) = ('', '', '0', '0', '', '0', '0', '', '')
 
-def getVinfo(ident, type):
-  fileName = '/tmp/vid' + `int(random.random()*9999)`
-  (author, id, title, width, height, desc, views, upDate) = ('', '', '', '0', '0', '', '0', '0')
-
-  if type == 1:
-    os.system('wget --timeout=30 --tries=3 -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetailsByUrl&api_key=' + apiKey + '&url=' + ident + '&include_comments=0"')
-  else:
-    os.system('wget --timeout=30 --tries=3 -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetails&api_key=' + apiKey + '&video_id=' + ident + '&include_comments=0"')
+  fileName = '/tmp/vids/viddler-' + vid
+  os.system('wget --timeout=30 --tries=3 -q -O ' + fileName + ' "http://api.viddler.com/rest/v1/?method=viddler.videos.getDetails&api_key=' + apiKey + '&video_id=' + vid + '&include_comments=0"')
 
   try:
     xmlDoc = xml.dom.minidom.parse(fileName)
@@ -26,7 +20,9 @@ def getVinfo(ident, type):
     curNode = xmlDoc.documentElement.firstChild # should now be inside <video>
   
     while curNode:
-      if curNode.tagName == 'author':
+      if curNode.tagName == 'code': # this is <error><code> -- aaa, abandon ship
+        return ('', '', '0', '0', '', '0', '0', '', '')
+      elif curNode.tagName == 'author':
         author = curNode.firstChild.data
       elif curNode.tagName == 'id':
         id = curNode.firstChild.data
@@ -47,31 +43,20 @@ def getVinfo(ident, type):
         views = curNode.firstChild.data
       elif curNode.tagName == 'upload_time':
         upDate = curNode.firstChild.data
+      elif curNode.tagName == 'files':
+        fNode = curNode.firstChild
+        while fNode:
+          if fNode.tagName == 'source':
+            srcURL = fNode.firstChild.data
+          elif fNode.tagName == 'flv':
+            encURL = fNode.firstChild.data
+
+          fNode = fNode.nextSibling
   
       curNode = curNode.nextSibling
   except:
-    return (author, id, title, width, height, desc, views, upDate)
+    return (author, title, width, height, desc, views, upDate, srcURL, encURL)
 
   os.remove(fileName)
 
-  return (author, id, title, width, height, desc, views, upDate)
-
-
-def getRes(fName):
-  (result,result2) = ('-','-')
-
-  p = subprocess.Popen(shlex.split('/usr/bin/ffmpeg -i ' + fName), stderr=subprocess.PIPE)
-  for line in p.stderr:
-    m = re.search('^    Stream \S+: Video: \S+, \S+, (\d+x\d+)[, ]', line)
-    if m:
-      result = m.group(1)
-
-    # backup plan
-    m = re.search('Could not find codec parameters \(Video: \S+, (\d+x\d+)\)', line)
-    if m:
-      result2 = m.group(1)
-
-  if result == '-':
-    result = result2
-
-  return result
+  return (author, title, width, height, desc, views, upDate, srcURL, encURL)

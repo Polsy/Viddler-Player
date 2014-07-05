@@ -4,19 +4,18 @@ import cgi
 import codecs
 import commands
 import Cookie
+import httplib
 import os
 import re
 import sys
 import time
 
-from getInfo import *
-from vidKeys import *
-
-newViddlerTime = 1277208387000 # thanks wampalord video 22!
+from getInfo2 import *
+from vidKeys2 import *
 
 embedTxt = '<object classid="clsid:D27CDB6E-AE6D-11cf-96B8-444553540000" width="WIDTH" height="HEIGHT" id="viddler"><param name="flashvars" value="FLASHVARS" /><param name="movie" value="http://www.viddler.com/PLAYER/VIDEOID/" /><param name="allowScriptAccess" value="always" /><param name="allowFullScreen" value="true" /><param name="wmode" value="transparent" /><embed id="vEmbed" src="http://www.viddler.com/PLAYER/VIDEOID/" width="WIDTH" height="HEIGHT" type="application/x-shockwave-flash" allowScriptAccess="always" flashvars="FLASHVARS" allowFullScreen="true" wmode="transparent" name="viddler" ></embed></object>'
 
-vidFormTxt = 'Viddler username: <input name="user" size=15 maxlength=15 type="text" value="FUSER"> Video number: <input name="video" size=4 maxlength=4 type="text" value="FVIDEO"><br>\nOr paste URL: <input name="vurl" type="text" size=64><br><br>\nStart video at (seconds): <input name="start" size=4 maxlength=4 type="text" value="START"><br>\n<input type="checkbox" name="useSimple"FSIMPLE>Use simple player<br>\n<input type="checkbox" name="origRes"FRES>Force source video resolution<br>\n'
+vidFormTxt = 'Viddler username: <input name="user" size=15 maxlength=15 type="text" value="FUSER"> Video number: <input name="video" size=4 maxlength=4 type="text" value="FVIDEO"><br>\nOr paste URL: <input name="vurl" type="text" size=64 value="FURL"><br><br>\nStart video at (seconds): <input name="start" size=4 maxlength=4 type="text" value="START"><br>\n<input type="checkbox" name="useSimple"FSIMPLE>Use simple player<br>\n<input type="checkbox" name="origRes"FRES>Force source video resolution<br>\n'
 
 setFormTxt = 'Original video size: <input type="radio" name="setOrigRes" value="1"OR1>Always on <input type="radio" name="setOrigRes" value="0"OR0>Always off <input type="radio" name="setOrigRes" value="-1"OR-1>Use URL setting<br>'
 setFormTxt += 'Use simple player: <input type="radio" name="setUseSimple" value="1"US1>Always on <input type="radio" name="setUseSimple" value="0"US0>Always off <input type="radio" name="setUseSimple" value="-1"US-1>Use URL setting<br>'
@@ -105,16 +104,22 @@ if form.getfirst('settings'):
     print 'Status: 302 Temporarily moved'
     print 'Location: ' + prevLoc + '\n'
     sys.exit(0)
+
+(vidUser, vidVid, vNum) = ('', '', '')
  
 # Figure out real Viddler URL from posted user/video number/URL
+# or use /v/ID
 vidUrl = form.getfirst('vurl', '')
 if vidUrl:
   uMatch = re.search('viddler.com/(?:explore/)?([^/]+)/videos/(\d+)', vidUrl)
   if uMatch:
     (vidUser, vidVid) = uMatch.groups()
   else:
-    errState = 2
-    (vidUser, vidVid) = ('', '')
+    uMatch = re.search('viddler.com/v/([0-9a-z]+)', vidUrl)
+    if uMatch:
+      (vidUser, vNum) = ('_', uMatch.group(1))  
+    else:
+      errState = 2
 else:
   vidUser = form.getfirst('user', '')
   vidVid = form.getfirst('video', '')
@@ -122,8 +127,32 @@ else:
 vidUser = re.sub('[^-A-Za-z0-9_]+', '', vidUser)
 vidVid = re.sub('[^0-9]+', '', vidVid)
 
-# Trailing slash I guess is the official format as the API demands it
-vPage = 'http://www.viddler.com/explore/' + vidUser + '/videos/' + vidVid + '/'
+if vidUser and vidVid:
+  # Convert to vNum, or try to
+  cacheRFile = 'cache/R/' + vidUser + '-' + vidVid
+  if os.path.exists(cacheRFile):
+    f = open(cacheRFile, 'r')
+    vNum = f.read()
+    f.close()
+  else:
+    hReq = httplib.HTTPConnection('www.viddler.com')
+    hReq.request('HEAD', '/explore/' + vidUser + '/videos/' + vidVid + '/')
+    hRes = hReq.getresponse()
+    if hRes.getheader('Location'):
+      newURL = hRes.getheader('Location')
+      if re.search('viddler.com/v/', newURL):
+        f = open(cacheRFile, 'w')
+        vNum = re.search('viddler.com/v/([a-z0-9]+)', newURL).group(1)
+        f.write(vNum)
+        f.close()
+
+if vNum:
+  vPage = 'http://www.viddler.com/v/' + vNum
+elif vidUser:
+  # Trailing slash I guess is the official format as the API demands it
+  vPage = 'http://www.viddler.com/explore/' + vidUser + '/videos/' + vidVid + '/'
+else:
+  vPage = ''
 
 # Select player type from form (or cookies)
 if cUseSimple == -1:
@@ -151,24 +180,29 @@ if fXres != '0':
   origRes = 1
 
 vTitle = ''
-zeroError = ''
+vSError = ''
 vVersion = 0
 
-if vidUser and vidVid:
-  cacheFile = 'cache/' + vidUser.lower() + vidVid
+if (vidUser and vidVid) or vNum:
+  if vNum:
+    cacheFile = 'cache/' + vNum
+  else:
+    cacheFile = 'cache/' + vidUser.lower() + vidVid
 
   if os.path.exists(cacheFile):
     f = codecs.open(cacheFile, 'r', 'utf-8')
     vVersion = f.readline().rstrip()
     if(len(vVersion) > 1):
       vNum = vVersion
-      vVersion = '0'
+      vVersion = 0
     else:
-      vNum = f.readline().rstrip()
+      vVersion = int(vVersion)
+      if vVersion < 3:
+        vNum = f.readline().rstrip()
 
-    vExt = f.readline().rstrip()
+    vSourceExt = f.readline().rstrip()
 
-    if vVersion != '0':
+    if vVersion != 0:
       vEWidth = f.readline().rstrip()
       vEHeight = f.readline().rstrip()
       vSError = f.readline().rstrip()
@@ -182,128 +216,64 @@ if vidUser and vidVid:
     vTitle = f.readline().rstrip()
     vDesc = f.readline().rstrip()
     vViews = f.readline().rstrip()
+
+    (vFLVHD, vSourceL, vEncodedL) = ('', '', '')
+    if vVersion == 2:
+      vFLVHD = f.readline().rstrip()
+    elif vVersion == 3:
+      vSourceL = f.readline().rstrip()
+      vEncodedL = f.readline().rstrip()
+
     f.close()
 
-    # Check whether original file has been removed (if it wasn't already)
-    if vExt != 'flv' and vExt != '' and vExt[0] != '!' and (time.time() - os.path.getmtime(cacheFile)) > 24*60*60:
-      vOrigStr = commands.getoutput("/usr/bin/wget -q --header='" + viddlerCookie + "' -O - " + vPage + " | egrep 'dmoriginal|dmflash'")
-      if re.search('dmflash', vOrigStr) and not re.search('dmoriginal', vOrigStr):
-        vExt = '!' + vExt
-
     # reread info (mainly to update view count) - always do this if views < 5 to stop 'wow I was the first view!' posts
-    if vVersion == '0' or int(vViews) < 5 or (time.time() - os.path.getmtime(cacheFile)) > 2*60*60:
-      (newVUpper, newVNum, newVTitle, newVWidth, newVHeight, newVDesc, newVViews, vUpDate) = getVinfo(vNum, 2)
+    if vVersion == 0 or int(vViews) < 5 or (time.time() - os.path.getmtime(cacheFile)) > 2*60*60:
+      (newVUpper, newVTitle, newVSWidth, newVSHeight, newVEWidth, newVEHeight, newVDesc, newVViews, newVUpDate, newVSourceL, newVSourceExt, newVEncodedL, newVEncodedExt) = getVinfo(vNum)
 
-      if newVNum: # failure isn't particularly problematic
-        if vVersion == '0': # File doesn't have encoded resolution or source error lines
-          if int(vUpDate) < newViddlerTime: # Old-style Viddler information?
-            # make an encoded resolution from the existing source resolution I have
-            # (copy-paste from below)
-            if vSWidth == '0': # This probably shouldn't happen as it means I never got a res in the first place
-              (vEWidth, vEHeight) = ('640', '480')
-              vSError = 'sorry, can\'t detect resolution at all - using 640x480'
-            else:
-              # Force to 640xwhatever where necessary
-              # (for the record, newer videos are all encoded at 640x regardless of source width)
-              if (int(vSWidth) > 640 or int(vSWidth) < 320):
-                vEWidth = '640'
-                vRatio = 640.0 / int(vSWidth)
-                vEHeight = `int(int(vSHeight) * vRatio)`
-                vSError = '' # no problem here
-              else:
-                # Encoded = source
-                (vEWidth, vEHeight) = (vSWidth, vSHeight)
-                vSError = ''
-          else:
-            # The 'source' resolution I already have is actually the encoded one. Sorry, source :(
-            (vEWidth, vEHeight) = (vSWidth, vSHeight)
-            vSError = 'copied from encoded res'
+      if newVUpper: # failure isn't particularly problematic
+        if newVSWidth == '0': # keep the old res
+          (newVSWidth, newVSHeight) = (vSWidth, vSHeight)
+        if newVEWidth == '0': # keep the old res
+          (newVEWidth, newVEHeight) = (vEWidth, vEHeight)
 
-        # Rest of the information is actually reliable
-        (vUpper, vNum, vTitle, vDesc, vViews) = (newVUpper, newVNum, newVTitle, newVDesc, newVViews)
+        (vUpper, vTitle, vSWidth, vSHeight, vEWidth, vEHeight, vDesc, vViews, vSourceL, vEncodedL) = (newVUpper, newVTitle, newVSWidth, newVSHeight, newVEWidth, newVEHeight, newVDesc, newVViews, newVSourceL, newVEncodedL)
 
+      if not newVUpper and vVersion != 3:
+        pass # don't destroy existing user/video cache files, even if the video no longer exists
       else:
-        # If old video and video info inaccessible, use the existing info & copy the resolution
-        # (just so all my files can be v1)
-        if vVersion == '0':
-          (vEWidth, vEHeight) = (vSWidth, vSHeight) 
-          vSError = newVDesc # most likely 'video not found' or 'wrong privileges''video deleted'
- 
-      f = codecs.open(cacheFile, 'w', 'utf-8')
-      f.write('1\n') # version
-      f.write(vNum + '\n')
-      f.write(vExt + '\n')
-      f.write(vEWidth + '\n')
-      f.write(vEHeight + '\n')
-      f.write(vSError + '\n')
-      f.write(vSWidth + '\n')
-      f.write(vSHeight + '\n')
-      f.write(vUpper + '\n')
-      f.write(vTitle + '\n')
-      f.write(vDesc + '\n')
-      f.write(vViews + '\n')
-      f.close()
-
-  else: # new video entirely
-    (vUpper, vNum, vTitle, vEWidth, vEHeight, vDesc, vViews, vUpDate) = getVinfo(vPage, 1)
-
-    if vNum:
-      # Still need to do this for the download link
-      vOrigStr = commands.getoutput("/usr/bin/wget -q --header='" + viddlerCookie + "' -O - " + vPage + " | egrep 'dmoriginal|dmflash'")
-      if re.search('dmoriginal', vOrigStr):
-        if re.search('\.unknown">', vOrigStr):
-          vExt = 'unknown'
-        else:
-          try:
-            vExt = re.search('\.(.{3,4})(\?vfid=[a-z0-9]+)?">Original</a>', vOrigStr).group(1)
-          except:
-            vExt = 'flv'
-      elif re.search('dmflash', vOrigStr):
-        vExt = 'flv'
-      else:
-        vExt = ''
-
-      if int(vUpDate) < newViddlerTime:
-        # In older files, the API returns the source resolution
-        # Also their source files are long gone, so checking the source below is pointless
-        (vSWidth, vSHeight) = (vEWidth, vEHeight)
-
-        if vSWidth == '0': # Old h264 FLV, source res appears as 0x0, original source is unavailable
-          # So, have to make something up
-          (vEWidth, vEHeight) = ('640', '480')
-          vSError = 'sorry, can\'t detect resolution at all - using 640x480'
-        else:
-          # Calculate encoded size (FLVs are untouched, but all videos appear as FLV now, oops)
-          if (int(vSWidth) > 640 or int(vSWidth) < 320):
-            vEWidth = '640'
-            vRatio = 640.0 / int(vSWidth)
-            vEHeight = `int(int(vSHeight) * vRatio)`
-            vSError = '' # no problem here
-          else:
-            # No problem, we're already at a cool resolution
-            vSError = ''
-
-      else: # newer style, API returns encoded res, source res is only available by checking source video file
-        # Try getting the source resolution via a partial download
-        srcFile = '/tmp/' + vNum
-        srcFile = str(srcFile) # if I don't do this srcFile is of type unicode, for some reason
-        srcBin = commands.getoutput("wget -q --header='" + viddlerCookie + "' -O - " + vPage[:-1] + "." + vExt + " | head -c 262144")
-        f = open(srcFile, 'w')
-        f.write(srcBin)
+        f = codecs.open(cacheFile, 'w', 'utf-8')
+        f.write('3\n') # version
+        f.write('*\n') # vExt, for compatibility
+        f.write(vEWidth + '\n')
+        f.write(vEHeight + '\n')
+        f.write(vSError + '\n')
+        f.write(vSWidth + '\n')
+        f.write(vSHeight + '\n')
+        f.write(vUpper + '\n')
+        f.write(vTitle + '\n')
+        f.write(vDesc + '\n')
+        f.write(vViews + '\n')
+        f.write(vSourceL + '\n')
+        f.write(vEncodedL + '\n')
         f.close()
 
-        resRes = getRes(srcFile)
-        if resRes == '-': # failed 
-          (vSWidth, vSHeight) = ('0', '0')
-          vSError = "ffmpeg couldn't get it"
-        else:
-          (vSWidth, vSHeight) = re.match('(\d+)x(\d+)', resRes).groups()
-          vSError = ''
+  else: # new video entirely
+    (vUpper, vTitle, vSWidth, vSHeight, vEWidth, vEHeight, vDesc, vViews, vUpDate, vSourceL, vSourceExt, vEncodedL, vEncodedExt) = getVinfo(vNum)
+
+    if vUpper: # else it failed
+      if vSWidth == '0':
+        (vSWidth, vSHeight) = (vEWidth, vEHeight)
+        vSError = 'copied from encoded'
  
+      if vSWidth == '0': # No file information returned for some reason - assume 640x480
+        (vEWidth, vEHeight) = ('640', '480')
+        vSError = 'sorry, can\'t detect resolution at all - using 640x480'
+  
       f = codecs.open(cacheFile, 'w', 'utf-8')
-      f.write('1\n') # version
-      f.write(vNum + '\n')
-      f.write(vExt + '\n')
+      f.write('3\n') # version
+      # I have the file extension available but it's not actually useful now
+      vSourceExt = '*'
+      f.write('*\n')
       f.write(vEWidth + '\n')
       f.write(vEHeight + '\n')
       f.write(vSError + '\n')
@@ -313,9 +283,11 @@ if vidUser and vidVid:
       f.write(vTitle + '\n')
       f.write(vDesc + '\n')
       f.write(vViews + '\n')
+      f.write(vSourceL + '\n')
+      f.write(vEncodedL + '\n')
       f.close()
     else:
-      errState = 1
+      errState = 1 
 
 print "Content-Type: text/html; charset=utf-8\n"
 
@@ -398,7 +370,7 @@ if errState == 1:
   print 'Sorry, there was an error getting the video details. If <a href="' + vPage + '">this</a> is definitely a valid video link, let Polsy know.<br>'
 elif errState == 2:
   print 'Sorry, there was an error getting the video details. If <a href="' + vidUrl + '">' + vidUrl + '</a> is definitely a valid video link, let Polsy know.<br>'
-elif vidUser and vidVid:
+elif (vidUser and vidVid) or vNum:
   sourceRes = 'Source resolution: ' + vSWidth + 'x' + vSHeight
   if vSError:
     sourceRes += ' (inaccurate)'
@@ -460,19 +432,36 @@ elif vidUser and vidVid:
   print '<br><br>'
   print '<a href="' + vPage + '">Viddler page</a>',
 
-  if vExt != '':
-    if vExt == 'flv' or vExt[0] == '!':
-      print '<a href="' + vPage[:-1] + '.flv">Download Flash</a>'
+  if vSourceExt != '':
+    if vSourceExt == '*': # v3+, have full paths
+      if vSourceL and vEncodedL:
+        print 'Download:',
+      elif vSourceL or vEncodedL: # it's possible neither exist
+        print 'Download',
+
+      if vSourceL:
+        print '<a href="' + vSourceL + '">Original</a>'
+      if vEncodedL:
+        print '<a href="' + vEncodedL + '">Flash</a>'
     else:
-      print '<a href="' + vPage[:-1] + '.' + vExt + '">Download original</a>'
+      if vSourceExt == 'flv' or vSourceExt[0] == '!':
+        print '<a href="' + vPage[:-1] + '.flv">Download Flash</a>'
+      else:
+        if vFLVHD:
+          print 'Download: <a href="' + vPage[:-1] + '.' + vSourceExt + '">Original</a> <a href="' + vFLVHD + '">Flash HD</a> <a href="' + vPage[:-1] + '.flv">Flash SD</a>'
+        else:
+          print 'Download: <a href="' + vPage[:-1] + '.' + vSourceExt + '">Original</a> <a href="' + vPage[:-1] + '.flv">Flash</a>'
 
   print '<br><script language="JavaScript">trueW=' + vWidth + '; trueH=' + str(int(vHeight)-42) + '; document.write(\'<select id="pickSz" onchange="szChange();");"><option value="75">75%<option value="100" selected>100%<option value="200">200%</select> <button onclick="fullify();">Fill browser window</button>\');</script>'
 
 print """<br><br><br>
 <form method="GET">"""
 
+if vidUser == '_':
+  vidUser = vUpper
 vidFormTxt = re.sub('FUSER', vidUser, vidFormTxt)
 vidFormTxt = re.sub('FVIDEO', vidVid, vidFormTxt)
+vidFormTxt = re.sub('FURL', vPage, vidFormTxt)
 if useSimple:
   vidFormTxt = re.sub('FSIMPLE', ' checked', vidFormTxt)
 else:
@@ -482,7 +471,6 @@ if origRes:
 else:
   vidFormTxt = re.sub('FRES', '', vidFormTxt)
 vidFormTxt = re.sub('START', startTime, vidFormTxt)
-
 print vidFormTxt
 
 print """<br><input id="btnSubmit" type="submit"></form>
